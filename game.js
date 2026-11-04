@@ -1,7 +1,6 @@
 const $ = id => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d');
 const D = [[0,-1],[1,0],[0,1],[-1,0]];
-const COUNT = 50; // lagbhag 50 arrows har level mein
 
 let level = 1, lives = 3, snakes = [], grid = [], cols, rows, cell, ox, oy, W, H, st;
 let hintId = -1, hintT = 0, restTimer, looping = false, AC = null;
@@ -14,9 +13,7 @@ function ac(){
   try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); AC.resume(); return AC; }
   catch (e) { return null; }
 }
-
-// Arrow nikalne ki awaaz: "chhis"
-function sGo(){
+function sGo(){ // arrow nikalne ki awaaz: chhis
   const A = ac(); if (!A) return;
   const n = A.sampleRate * .3, b = A.createBuffer(1, n, A.sampleRate), d = b.getChannelData(0);
   for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2);
@@ -27,9 +24,7 @@ function sGo(){
   const g = A.createGain(); g.gain.value = .6;
   s.connect(f); f.connect(g); g.connect(A.destination); s.start();
 }
-
-// Takrane ki awaaz
-function sBump(){
+function sBump(){ // takrane ki awaaz
   const A = ac(); if (!A) return;
   const o = A.createOscillator(), g = A.createGain(), t = A.currentTime;
   o.type = 'square';
@@ -37,7 +32,6 @@ function sBump(){
   g.gain.setValueAtTime(.18, t); g.gain.exponentialRampToValueAtTime(.001, t + .22);
   o.connect(g); g.connect(A.destination); o.start(); o.stop(t + .22);
 }
-
 function clap(){
   const A = ac(); if (!A) return;
   const n = A.sampleRate * .12;
@@ -56,11 +50,13 @@ function clap(){
 function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
   t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 
-// Grid kinare se andar ki taraf bharta hai, is liye koi khali jagah nahi bachti
+// Grid kinare se andar ki taraf bharta hai. Har arrow lamba hota hai aur deewar/doosre
+// arrows se chipak kar chalta hai, is se shapes banti hain. Koi jagah khali nahi bachti
 // aur level hamesha hal ho sakta hai.
 function build(L){
   const R = rng(L * 7919 + 13);
-  cols = Math.min(16, 10 + Math.floor(L / 170)); rows = Math.round(cols * 1.5);
+  cols = Math.min(20, 13 + Math.floor(L / 140)); rows = Math.round(cols * 1.5);
+  const avg = 6 + L / 125; // level barhne par arrows lambay
   const g = Array.from({length: rows}, () => Array(cols).fill(-1)), S = [];
   const inb = (x, y) => x >= 0 && y >= 0 && x < cols && y < rows;
   const free = (x, y) => inb(x, y) && g[y][x] < 0;
@@ -70,6 +66,7 @@ function build(L){
     return true;
   };
   const bd = (x, y) => Math.min(x, y, cols - 1 - x, rows - 1 - y);
+  const walls = (x, y) => { let n = 0; for (const [dx, dy] of D) { const a = x + dx, b = y + dy; if (!inb(a, b) || g[b][a] >= 0) n++; } return n; };
   let left = cols * rows;
 
   while (left > 0) {
@@ -80,26 +77,35 @@ function build(L){
     }
     const [hx, hy] = c[Math.floor(R() * c.length)];
     const id = S.length;
-    const target = Math.max(2, Math.round(left / Math.max(1, COUNT - id) * (.6 + R() * .8)));
+    const target = Math.max(2, Math.round(avg * (.3 + R() * 1.7)));
     const dirs = [0,1,2,3].filter(d => rayFilled(hx, hy, D[d][0], D[d][1])).sort(() => R() - .5);
     const pick = dirs.find(d => free(hx - D[d][0], hy - D[d][1]));
     g[hy][hx] = id;
     let path = [[hx, hy]], dir = dirs.length ? dirs[0] : 0;
     if (pick !== undefined) {
       dir = pick;
-      let cx = hx - D[dir][0], cy = hy - D[dir][1];
+      let cx = hx - D[dir][0], cy = hy - D[dir][1], last = [-D[dir][0], -D[dir][1]];
       const tail = [[cx, cy]]; g[cy][cx] = id;
       while (tail.length + 1 < target) {
-        let moved = false;
-        for (const d of [0,1,2,3].sort(() => R() - .5)) {
-          const nx = cx + D[d][0], ny = cy + D[d][1];
-          if (free(nx, ny)) { tail.push([nx, ny]); g[ny][nx] = id; cx = nx; cy = ny; moved = true; break; }
+        let bn = null, bs = -1;
+        for (const d of D) {
+          const nx = cx + d[0], ny = cy + d[1];
+          if (!free(nx, ny)) continue;
+          const sc = walls(nx, ny) * 2 + (d[0] === last[0] && d[1] === last[1] ? 1 : 0) + R() * 2;
+          if (sc > bs) { bs = sc; bn = [nx, ny, d]; }
         }
-        if (!moved) break;
+        if (!bn) break;
+        tail.push([bn[0], bn[1]]); g[bn[1]][bn[0]] = id;
+        cx = bn[0]; cy = bn[1]; last = bn[2];
       }
       path = [...tail].reverse(); path.push([hx, hy]);
     }
-    S.push({id, p: path, dx: D[dir][0], dy: D[dir][1], alive: true, out: 0, bump: 0, gap: 0});
+    const dx = D[dir][0], dy = D[dir][1];
+    // P: arrow ka raasta (aur bahar tak seedhi lakeer) taake arrow lakeer par sarak kar nikle
+    const P = path.map(([x, y]) => [x + .5, y + .5]);
+    const hd = P[P.length - 1];
+    P.push([hd[0] + dx * (cols + rows + 60), hd[1] + dy * (cols + rows + 60)]);
+    S.push({id, p: path, P, Lb: Math.max(path.length - 1, .01), dx, dy, alive: true, out: 0, bump: 0, gap: 0, uEnd: 0, dur: 0});
     left -= path.length;
   }
   grid = g;
@@ -111,8 +117,8 @@ function mkStyle(L){
   const R = rng(L * 31 + 5);
   let hue = (L * 47) % 360;
   if (hue >= 70 && hue <= 170) hue = (hue + 110) % 360;
-  return {hue, l: 28 + Math.floor(R() * 10), lw: .1 + R() * .06,
-          head: L % 4, join: R() < .5 ? 'round' : 'miter', cap: R() < .5 ? 'round' : 'butt'};
+  return {hue, l: 28 + Math.floor(R() * 10), lw: .15 + R() * .06,
+          head: L % 3, join: R() < .5 ? 'round' : 'miter'};
 }
 
 // Arrow ke samne kitne cell door rukawat hai (0 matlab raasta khula)
@@ -137,27 +143,40 @@ function layout(){
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-function drawHead(x, y, dx, dy, k, type){
+// Lakeer ka wo hissa jo arclength a se b ke beech ho
+function slice(P, a, b){
+  const out = []; let d = 0;
+  for (let i = 1; i < P.length; i++) {
+    const [x0, y0] = P[i-1], [x1, y1] = P[i], l = Math.abs(x1 - x0) + Math.abs(y1 - y0);
+    const s = d, e = d + l;
+    if (l > 0 && e > a && s < b) {
+      const t0 = Math.max(a, s) - s, t1 = Math.min(b, e) - s, ux = (x1 - x0) / l, uy = (y1 - y0) / l;
+      if (!out.length) out.push([x0 + ux * t0, y0 + uy * t0]);
+      out.push([x0 + ux * t1, y0 + uy * t1]);
+    }
+    d = e;
+  }
+  return out;
+}
+
+function drawHead(x, y, dx, dy, c, type){
   const px = -dy, py = dx;
   ctx.beginPath();
-  if (type === 0) {
-    ctx.moveTo(x + dx*k, y + dy*k);
-    ctx.lineTo(x - dx*k*.3 + px*k*.7, y - dy*k*.3 + py*k*.7);
-    ctx.lineTo(x - dx*k*.3 - px*k*.7, y - dy*k*.3 - py*k*.7);
+  if (type === 0) {          // chhota thos tikon (picture jaisa)
+    ctx.moveTo(x + dx*c*.45, y + dy*c*.45);
+    ctx.lineTo(x - dx*c*.05 + px*c*.3, y - dy*c*.05 + py*c*.3);
+    ctx.lineTo(x - dx*c*.05 - px*c*.3, y - dy*c*.05 - py*c*.3);
     ctx.closePath(); ctx.fill();
-  } else if (type === 1) {
-    ctx.moveTo(x - dx*k*.2 + px*k*.8, y - dy*k*.2 + py*k*.8);
-    ctx.lineTo(x + dx*k*.7, y + dy*k*.7);
-    ctx.lineTo(x - dx*k*.2 - px*k*.8, y - dy*k*.2 - py*k*.8);
+  } else if (type === 1) {   // lamba patla tikon
+    ctx.moveTo(x + dx*c*.6, y + dy*c*.6);
+    ctx.lineTo(x - dx*c*.1 + px*c*.22, y - dy*c*.1 + py*c*.22);
+    ctx.lineTo(x - dx*c*.1 - px*c*.22, y - dy*c*.1 - py*c*.22);
+    ctx.closePath(); ctx.fill();
+  } else {                   // khula chevron
+    ctx.moveTo(x - dx*c*.1 + px*c*.3, y - dy*c*.1 + py*c*.3);
+    ctx.lineTo(x + dx*c*.4, y + dy*c*.4);
+    ctx.lineTo(x - dx*c*.1 - px*c*.3, y - dy*c*.1 - py*c*.3);
     ctx.stroke();
-  } else if (type === 2) {
-    ctx.arc(x + dx*k*.2, y + dy*k*.2, k*.6, 0, 7); ctx.fill();
-  } else {
-    ctx.moveTo(x + dx*k, y + dy*k);
-    ctx.lineTo(x + px*k*.6, y + py*k*.6);
-    ctx.lineTo(x - dx*k*.6, y - dy*k*.6);
-    ctx.lineTo(x - px*k*.6, y - py*k*.6);
-    ctx.closePath(); ctx.fill();
   }
 }
 
@@ -165,32 +184,28 @@ function frame(now){
   ctx.clearRect(0, 0, W, H);
   ctx.save(); ctx.translate(ox, oy);
   for (const s of snakes) {
-    let a = 1, tx = 0, ty = 0, lw = cell * st.lw;
-    let col = `hsl(${st.hue},55%,${st.l}%)`;
-    if (s.out) {                        // raasta khula: arrow bahar nikal jata hai
-      const t = (now - s.out) / 380;
+    let u = 0, lw = cell * st.lw, col = `hsl(${st.hue},55%,${st.l}%)`;
+    if (s.out) {                         // raasta khula: arrow apni lakeer par sarak kar nikal jata hai
+      const t = (now - s.out) / s.dur;
       if (t >= 1) continue;
-      a = 1 - t; const e = t * t * cell * (cols + rows) * .3;
-      tx = s.dx * e; ty = s.dy * e;
-    }
-    if (s.bump && now - s.bump < 500) { // doosre arrow se takraya: lal ho kar wapis apni jagah
-      const t = (now - s.bump) / 500;
-      const e = Math.sin(Math.PI * t) * s.gap;
-      tx = s.dx * e; ty = s.dy * e; col = '#d64545';
+      u = s.uEnd * t * t;
+    } else if (s.bump && now - s.bump < 500) {   // takraya: lal ho kar wapis apni jagah
+      u = Math.sin(Math.PI * (now - s.bump) / 500) * s.gap; col = '#d64545';
     }
     if (s.id === hintId && now < hintT) { col = '#f08a00'; lw *= 1.4; }
-    ctx.globalAlpha = a; ctx.strokeStyle = col; ctx.fillStyle = col;
-    ctx.lineWidth = lw; ctx.lineJoin = st.join; ctx.lineCap = st.cap;
+    const pts = slice(s.P, u, u + s.Lb);
+    if (pts.length < 2) continue;
+    ctx.strokeStyle = col; ctx.fillStyle = col;
+    ctx.lineWidth = lw; ctx.lineJoin = st.join; ctx.lineCap = 'butt'; ctx.miterLimit = 4;
     ctx.beginPath();
-    s.p.forEach(([x, y], i) => {
-      const X = (x + .5) * cell + tx, Y = (y + .5) * cell + ty;
-      i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y);
-    });
+    pts.forEach((p, i) => i ? ctx.lineTo(p[0] * cell, p[1] * cell) : ctx.moveTo(p[0] * cell, p[1] * cell));
     ctx.stroke();
-    const h = s.p[s.p.length - 1];
-    drawHead((h[0] + .5) * cell + tx, (h[1] + .5) * cell + ty, s.dx, s.dy, cell * .36, st.head);
+    const a = pts[pts.length - 2], b = pts[pts.length - 1];
+    let dx = Math.sign(b[0] - a[0]), dy = Math.sign(b[1] - a[1]);
+    if (!dx && !dy) { dx = s.dx; dy = s.dy; }
+    drawHead(b[0] * cell, b[1] * cell, dx, dy, cell, st.head);
   }
-  ctx.restore(); ctx.globalAlpha = 1;
+  ctx.restore();
   requestAnimationFrame(frame);
 }
 
@@ -205,7 +220,7 @@ function dseg(px, py, ax, ay, bx, by){
 cv.addEventListener('pointerdown', e => {
   const r = cv.getBoundingClientRect();
   const x = e.clientX - r.left - ox, y = e.clientY - r.top - oy;
-  let best = null, bd = Math.max(cell * .7, 14);
+  let best = null, bd = Math.max(cell * .5, 12);
   for (const s of snakes) {
     if (!s.alive) continue;
     if (s.p.length === 1) {
@@ -222,14 +237,14 @@ cv.addEventListener('pointerdown', e => {
 });
 
 // Raasta khula ho to arrow nikalta hai (chhis awaaz).
-// Raasta band ho to arrow jata hai, doosre arrow se takrata hai, lal hota hai,
+// Raasta band ho to arrow aage jata hai, doosre arrow se takrata hai, lal hota hai,
 // wapis apni jagah aata hai aur ek boond kam hoti hai.
 function tap(s){
   const now = performance.now();
-  if (now - s.bump < 500) return;
+  if (s.out || now - s.bump < 500) return;
   const n = ray(s);
   if (n > 0) {
-    s.bump = now; s.gap = Math.max(.15, n - .85) * cell;
+    s.bump = now; s.gap = Math.max(.3, n - .4);
     sBump();
     lives--; drops();
     if (lives <= 0) setTimeout(lose, 650);
@@ -237,8 +252,12 @@ function tap(s){
   }
   sGo();
   s.alive = false; s.out = now;
-  s.p.forEach(([x, y]) => grid[y][x] = -1);
-  if (snakes.every(q => !q.alive)) setTimeout(win, 450);
+  const h = s.p[s.p.length - 1];
+  let k = 0, x = h[0] + s.dx, y = h[1] + s.dy;
+  while (x >= 0 && y >= 0 && x < cols && y < rows) { k++; x += s.dx; y += s.dy; }
+  s.uEnd = s.Lb + k + 1.5; s.dur = Math.min(900, 250 + s.uEnd * 18);
+  s.p.forEach(([a, b]) => grid[b][a] = -1);
+  if (snakes.every(q => !q.alive)) setTimeout(win, s.dur + 150);
 }
 
 $('hint').onclick = () => {
@@ -291,7 +310,6 @@ function showHome(){
     .map(i => `<span class="${i ? '' : 'cur'}">${level + i}</span>`).join('');
 }
 
-// Level ke gole par ya Play par tap karne se game shuru
 function start(){
   ac();
   $('home').hidden = true; $('game').hidden = false;
@@ -304,5 +322,4 @@ $('back').onclick = showHome;
 
 window.addEventListener('resize', () => { if (!$('game').hidden) layout(); });
 
-// Pehle splash (3 second), phir level wala page
 setTimeout(() => { $('splash').hidden = true; showHome(); }, 3000);
