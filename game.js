@@ -4,11 +4,12 @@ const D = [[0,-1],[1,0],[0,1],[-1,0]];
 const COUNT = 50; // har level mein 50 arrows
 
 let level = 1, lives = 3, snakes = [], grid = [], cols, rows, cell, ox, oy, W, H, st;
-let hintId = -1, hintT = 0, restTimer;
+let hintId = -1, hintT = 0, restTimer, looping = false;
 
 try { level = Math.min(1000, Math.max(1, +localStorage.getItem('am_level') || 1)); } catch (e) {}
 const save = () => { try { localStorage.setItem('am_level', level); } catch (e) {} };
 
+// Seed wala random: har level ka naqsha hamesha wahi banta hai
 function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
   t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 
@@ -58,11 +59,12 @@ function place(L, c, attempt){
 }
 
 // 50 arrows pure hone tak grid thora bara karte jao
+// Arrow chhote chahiye to 18 ko bara karo, bare chahiye to chhota
 function gen(L){
-  const base = Math.min(15, 11 + Math.floor(Math.sqrt(L) / 8));
+  const base = Math.min(24, 18 + Math.floor(Math.sqrt(L) / 8));
   let best = null;
   for (let a = 0; a < 40; a++) {
-    const r = place(L, Math.min(22, base + Math.floor(a / 3)), a);
+    const r = place(L, Math.min(30, base + Math.floor(a / 3)), a);
     r.cols = cols; r.rows = rows;
     if (!best || r.S.length > best.S.length) best = r;
     if (r.S.length >= COUNT) break;
@@ -80,6 +82,7 @@ function mkStyle(L){
           head: L % 4, join: R() < .5 ? 'round' : 'miter', cap: R() < .5 ? 'round' : 'butt'};
 }
 
+// Arrow ke samne rukawat ho to us arrow ka id, warna -1
 function blocker(s){
   const h = s.p[s.p.length - 1];
   let cx = h[0] + s.dx, cy = h[1] + s.dy;
@@ -201,6 +204,7 @@ function ov(title, sub, btn, fn){
   $('ov').hidden = false;
 }
 
+// Taaliyon ki awaaz (bina kisi file ke)
 function clap(){
   try {
     const A = new (window.AudioContext || window.webkitAudioContext)(); A.resume();
@@ -217,33 +221,50 @@ function clap(){
   } catch (e) {}
 }
 
-// Level poora: taaliyan, Next, phir "Level N" page, Play dabane par game shuru
+// Level poora: taaliyan, Next, phir home par agla level
 function win(){
   clap();
-  if (level >= 1000) { ov('All 1000 levels finished', 'Congratulations!', '↺', () => { level = 1; save(); load(); }); return; }
-  ov('Level ' + level + ' complete', 'Well played.', '▶', () => {
-    level++; save(); load();
-    ov('Level ' + level, 'Tap Play to start.', 'Play', () => {});
-  });
+  if (level >= 1000) { ov('All 1000 levels finished', 'Congratulations!', '↺', () => { level = 1; save(); showHome(); }); return; }
+  ov('Level ' + level + ' complete', 'Well played.', '▶', () => { level++; save(); showHome(); });
 }
 function lose(){ ov('Out of drops', 'Try this level again.', '↻', load); }
 
-function load(){
-  snakes = gen(level); st = mkStyle(level); lives = 3; hintId = -1;
+// Page ka rang level ke hisab se badalta hai
+function theme(){
+  st = mkStyle(level);
   document.body.style.background = `hsl(${st.hue},45%,94%)`;
   document.body.style.color = `hsl(${st.hue},55%,30%)`;
+  document.body.style.setProperty('--h', st.hue);
+}
+
+function load(){
+  snakes = gen(level); theme(); lives = 3; hintId = -1;
   $('lv').textContent = 'Level ' + level;
   drops(); layout();
 }
 
+// 30 minute baad aaram ka message
 function rest(){
   clearTimeout(restTimer);
   restTimer = setTimeout(() => ov('Time to rest', 'You played for 30 minutes. Rest and sleep well.', 'OK', rest), 30 * 60 * 1000);
 }
 
+function showHome(){
+  theme();
+  $('game').hidden = true; $('home').hidden = false;
+  $('plv').textContent = 'Level ' + level;
+  $('strip').innerHTML = [0,1,2,3,4].filter(i => level + i <= 1000)
+    .map(i => `<span class="${i ? '' : 'cur'}">${level + i}</span>`).join('');
+}
+
+$('play').onclick = () => {
+  $('home').hidden = true; $('game').hidden = false;
+  load();
+  if (!looping) { looping = true; rest(); requestAnimationFrame(frame); }
+};
+$('back').onclick = showHome;
+
 window.addEventListener('resize', () => { if (!$('game').hidden) layout(); });
 
-setTimeout(() => {
-  $('cover').hidden = true; $('game').hidden = false;
-  load(); rest(); requestAnimationFrame(frame);
-}, 2200);
+// Pehle splash (2 second), phir home
+setTimeout(() => { $('splash').hidden = true; showHome(); }, 2000);
