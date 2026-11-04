@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Arrow Maze</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="cover"><h1>Arrow Maze</h1></div>
+
+<div id="game" hidden>
+  <div id="top"><span id="lv">Level 1</span><button id="hint" aria-label="Hint">💡</button></div>
+  <div id="drops"></div>
+  <p id="note">Play for 30 minutes, then rest and sleep well.</p>
+  <div id="board"><canvas id="cv"></canvas></div>
+</div>
+
+<div id="ov" hidden>
+  <div id="box"><h2 id="ot"></h2><p id="os"></p><button id="ob"></button></div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
