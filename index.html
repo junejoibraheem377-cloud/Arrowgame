@@ -7,10 +7,20 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="cover"><h1>Arrow Maze</h1></div>
+<div id="splash"><div class="brand">Ibrahim</div><div class="sub">Games</div></div>
+
+<div id="home" hidden>
+  <h1>Arrow Maze</h1>
+  <div id="strip"></div>
+  <button id="play"><b>Play</b><small id="plv">Level 1</small></button>
+</div>
 
 <div id="game" hidden>
-  <div id="top"><span id="lv">Level 1</span><button id="hint" aria-label="Hint">💡</button></div>
+  <div id="top">
+    <button id="back" aria-label="Back">←</button>
+    <span id="lv">Level 1</span>
+    <button id="hint" aria-label="Hint">💡</button>
+  </div>
   <div id="drops"></div>
   <p id="note">Play for 30 minutes, then rest and sleep well.</p>
   <div id="board"><canvas id="cv"></canvas></div>
