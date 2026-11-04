@@ -1,12 +1,17 @@
 const $ = id => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d');
 const D = [[0,-1],[1,0],[0,1],[-1,0]];
+const ARROW = '#6b4a2e'; // screenshot jaisa gehra bhoora
 
-let level = 1, lives = 3, snakes = [], grid = [], cols, rows, cell, ox, oy, W, H, st;
+let level = 1, best = 1, lives = 3, snakes = [], grid = [], cols, rows, cell, ox, oy, W, H, st;
 let hintId = -1, hintT = 0, restTimer, looping = false, AC = null;
 
-try { level = Math.min(1000, Math.max(1, +localStorage.getItem('am_level') || 1)); } catch (e) {}
-const save = () => { try { localStorage.setItem('am_level', level); } catch (e) {} };
+// best = sab se aage ka khula hua level. Purane levels dobara khelne se ye nahi ghatta
+try {
+  best = Math.min(1000, Math.max(1, +localStorage.getItem('am_best') || +localStorage.getItem('am_level') || 1));
+  level = best;
+} catch (e) {}
+const save = () => { try { localStorage.setItem('am_best', best); } catch (e) {} };
 
 // ---------- Awaaz ----------
 function ac(){
@@ -50,13 +55,13 @@ function clap(){
 function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
   t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 
-// Grid kinare se andar ki taraf bharta hai. Har arrow lamba hota hai aur deewar/doosre
-// arrows se chipak kar chalta hai, is se shapes banti hain. Koi jagah khali nahi bachti
-// aur level hamesha hal ho sakta hai.
+// Grid kinare se andar ki taraf bharta hai. Arrows lambay hote hain aur deewar ya
+// doosre arrows se chipak kar chalte hain. Koi jagah khali nahi bachti aur level
+// hamesha hal ho sakta hai. Level barhne par grid bara aur arrows lambay (zyada mushkil).
 function build(L){
   const R = rng(L * 7919 + 13);
-  cols = Math.min(20, 13 + Math.floor(L / 140)); rows = Math.round(cols * 1.5);
-  const avg = 6 + L / 125; // level barhne par arrows lambay
+  cols = Math.min(20, 13 + Math.floor(L / 60)); rows = Math.round(cols * 1.5);
+  const avg = 6 + Math.min(L / 50, 14);
   const g = Array.from({length: rows}, () => Array(cols).fill(-1)), S = [];
   const inb = (x, y) => x >= 0 && y >= 0 && x < cols && y < rows;
   const free = (x, y) => inb(x, y) && g[y][x] < 0;
@@ -101,8 +106,7 @@ function build(L){
       path = [...tail].reverse(); path.push([hx, hy]);
     }
     const dx = D[dir][0], dy = D[dir][1];
-    // P: arrow ka raasta (aur bahar tak seedhi lakeer) taake arrow lakeer par sarak kar nikle
-    const P = path.map(([x, y]) => [x + .5, y + .5]);
+    const P = path.map(([x, y]) => [x + .5, y + .5]);   // lakeer jis par arrow sarakta hai
     const hd = P[P.length - 1];
     P.push([hd[0] + dx * (cols + rows + 60), hd[1] + dy * (cols + rows + 60)]);
     S.push({id, p: path, P, Lb: Math.max(path.length - 1, .01), dx, dy, alive: true, out: 0, bump: 0, gap: 0, uEnd: 0, dur: 0});
@@ -112,13 +116,10 @@ function build(L){
   return S;
 }
 
-// Har level ka apna design. Rang page ke rang jaisa, green nahi
+// Har level ka apna design (head aur moti). Rang screenshot wala bhoora
 function mkStyle(L){
   const R = rng(L * 31 + 5);
-  let hue = (L * 47) % 360;
-  if (hue >= 70 && hue <= 170) hue = (hue + 110) % 360;
-  return {hue, l: 28 + Math.floor(R() * 10), lw: .15 + R() * .06,
-          head: L % 3, join: R() < .5 ? 'round' : 'miter'};
+  return {lw: .15 + R() * .06, head: L % 3, join: R() < .5 ? 'round' : 'miter'};
 }
 
 // Arrow ke samne kitne cell door rukawat hai (0 matlab raasta khula)
@@ -143,8 +144,7 @@ function layout(){
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-// Lakeer ka wo hissa jo arclength a se b ke beech ho
-function slice(P, a, b){
+function slice(P, a, b){ // lakeer ka wo hissa jo a se b ki lambai ke beech ho
   const out = []; let d = 0;
   for (let i = 1; i < P.length; i++) {
     const [x0, y0] = P[i-1], [x1, y1] = P[i], l = Math.abs(x1 - x0) + Math.abs(y1 - y0);
@@ -162,17 +162,17 @@ function slice(P, a, b){
 function drawHead(x, y, dx, dy, c, type){
   const px = -dy, py = dx;
   ctx.beginPath();
-  if (type === 0) {          // chhota thos tikon (picture jaisa)
+  if (type === 0) {
     ctx.moveTo(x + dx*c*.45, y + dy*c*.45);
     ctx.lineTo(x - dx*c*.05 + px*c*.3, y - dy*c*.05 + py*c*.3);
     ctx.lineTo(x - dx*c*.05 - px*c*.3, y - dy*c*.05 - py*c*.3);
     ctx.closePath(); ctx.fill();
-  } else if (type === 1) {   // lamba patla tikon
+  } else if (type === 1) {
     ctx.moveTo(x + dx*c*.6, y + dy*c*.6);
     ctx.lineTo(x - dx*c*.1 + px*c*.22, y - dy*c*.1 + py*c*.22);
     ctx.lineTo(x - dx*c*.1 - px*c*.22, y - dy*c*.1 - py*c*.22);
     ctx.closePath(); ctx.fill();
-  } else {                   // khula chevron
+  } else {
     ctx.moveTo(x - dx*c*.1 + px*c*.3, y - dy*c*.1 + py*c*.3);
     ctx.lineTo(x + dx*c*.4, y + dy*c*.4);
     ctx.lineTo(x - dx*c*.1 - px*c*.3, y - dy*c*.1 - py*c*.3);
@@ -184,12 +184,12 @@ function frame(now){
   ctx.clearRect(0, 0, W, H);
   ctx.save(); ctx.translate(ox, oy);
   for (const s of snakes) {
-    let u = 0, lw = cell * st.lw, col = `hsl(${st.hue},55%,${st.l}%)`;
-    if (s.out) {                         // raasta khula: arrow apni lakeer par sarak kar nikal jata hai
+    let u = 0, lw = cell * st.lw, col = ARROW;
+    if (s.out) {                                   // raasta khula: lakeer par sarak kar nikalta hai
       const t = (now - s.out) / s.dur;
       if (t >= 1) continue;
       u = s.uEnd * t * t;
-    } else if (s.bump && now - s.bump < 500) {   // takraya: lal ho kar wapis apni jagah
+    } else if (s.bump && now - s.bump < 500) {     // takraya: lal ho kar wapis apni jagah
       u = Math.sin(Math.PI * (now - s.bump) / 500) * s.gap; col = '#d64545';
     }
     if (s.id === hintId && now < hintT) { col = '#f08a00'; lw *= 1.4; }
@@ -220,25 +220,24 @@ function dseg(px, py, ax, ay, bx, by){
 cv.addEventListener('pointerdown', e => {
   const r = cv.getBoundingClientRect();
   const x = e.clientX - r.left - ox, y = e.clientY - r.top - oy;
-  let best = null, bd = Math.max(cell * .5, 12);
+  let bestS = null, bd = Math.max(cell * .5, 12);
   for (const s of snakes) {
     if (!s.alive) continue;
     if (s.p.length === 1) {
       const d = Math.hypot(x - (s.p[0][0] + .5) * cell, y - (s.p[0][1] + .5) * cell);
-      if (d < bd) { bd = d; best = s; }
+      if (d < bd) { bd = d; bestS = s; }
       continue;
     }
     for (let i = 1; i < s.p.length; i++) {
       const d = dseg(x, y, (s.p[i-1][0]+.5)*cell, (s.p[i-1][1]+.5)*cell, (s.p[i][0]+.5)*cell, (s.p[i][1]+.5)*cell);
-      if (d < bd) { bd = d; best = s; }
+      if (d < bd) { bd = d; bestS = s; }
     }
   }
-  if (best) tap(best);
+  if (bestS) tap(bestS);
 });
 
 // Raasta khula ho to arrow nikalta hai (chhis awaaz).
-// Raasta band ho to arrow aage jata hai, doosre arrow se takrata hai, lal hota hai,
-// wapis apni jagah aata hai aur ek boond kam hoti hai.
+// Raasta band ho to arrow aage jata hai, takrata hai, lal hota hai, wapis aata hai, ek boond kam.
 function tap(s){
   const now = performance.now();
   if (s.out || now - s.bump < 500) return;
@@ -277,22 +276,19 @@ function ov(title, sub, btn, fn){
   $('ov').hidden = false;
 }
 
+// Naya level sirf tab khulta hai jab sab se aage wala level jeeto. Purana level jeetne se record nahi ghatta
 function win(){
   clap();
-  if (level >= 1000) { ov('All 1000 levels finished', 'Congratulations!', '↺', () => { level = 1; save(); showHome(); }); return; }
-  ov('Level ' + level + ' complete', 'Well played.', '▶', () => { level++; save(); showHome(); });
+  if (level >= 1000) { ov('All 1000 levels finished', 'Congratulations!', '↺', () => { level = 1; showHome(); }); return; }
+  ov('Level ' + level + ' complete', 'Well played.', '▶', () => {
+    if (level === best) { best++; save(); }
+    level++; showHome();
+  });
 }
 function lose(){ ov('Out of drops', 'Try this level again.', '↻', load); }
 
-function theme(){
-  st = mkStyle(level);
-  document.body.style.background = `hsl(${st.hue},45%,94%)`;
-  document.body.style.color = `hsl(${st.hue},55%,30%)`;
-  document.body.style.setProperty('--h', st.hue);
-}
-
 function load(){
-  snakes = build(level); theme(); lives = 3; hintId = -1;
+  snakes = build(level); st = mkStyle(level); lives = 3; hintId = -1;
   $('lv').textContent = 'Level ' + level;
   drops(); layout();
 }
@@ -302,12 +298,19 @@ function rest(){
   restTimer = setTimeout(() => ov('Time to rest', 'You played for 30 minutes. Rest and sleep well.', 'OK', rest), 30 * 60 * 1000);
 }
 
+// Home: 1 se le kar sab se aage wale khule level tak ki patti (scroll hoti hai)
 function showHome(){
-  theme();
   $('game').hidden = true; $('home').hidden = false;
   $('plv').textContent = 'Level ' + level;
-  $('strip').innerHTML = [0,1,2,3,4].filter(i => level + i <= 1000)
-    .map(i => `<span class="${i ? '' : 'cur'}">${level + i}</span>`).join('');
+  const last = Math.min(1000, best + 4);
+  let h = '';
+  for (let n = 1; n <= last; n++) {
+    const c = n === level ? 'cur' : n < best ? 'done' : '';
+    h += `<span data-n="${n}" class="${c} ${n > best ? 'lk' : ''}">${n}</span>`;
+  }
+  $('strip').innerHTML = h;
+  const cur = $('strip').querySelector('.cur');
+  if (cur) cur.scrollIntoView({inline: 'center', block: 'nearest'});
 }
 
 function start(){
@@ -317,7 +320,11 @@ function start(){
   if (!looping) { looping = true; rest(); requestAnimationFrame(frame); }
 }
 $('play').onclick = start;
-$('strip').onclick = e => { if (e.target.classList.contains('cur')) start(); };
+$('strip').onclick = e => {
+  const n = +e.target.dataset.n;
+  if (!n || n > best) return;               // jo level abhi khula nahi, wo band hai
+  if (n === level) start(); else { level = n; showHome(); }
+};
 $('back').onclick = showHome;
 
 window.addEventListener('resize', () => { if (!$('game').hidden) layout(); });
