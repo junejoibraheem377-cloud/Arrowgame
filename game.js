@@ -55,13 +55,14 @@ function clap(){
 function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
   t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 
-// Grid kinare se andar ki taraf bharta hai. Arrows lambay hote hain aur deewar ya
-// doosre arrows se chipak kar chalte hain. Koi jagah khali nahi bachti aur level
-// hamesha hal ho sakta hai. Level barhne par arrows lambay aur uljhe (zyada mushkil).
+// Mushkil har level ke saath barhti hai:
+//  - grid bara hota hai (Level 1 par 11 columns, Level 26 tak 24 columns)
+//  - arrows lambay aur uljhe hote jate hain (Level 1 par chhote, Level 600 tak bohat lambay)
+// Grid kinare se andar ki taraf bharta hai, koi jagah khali nahi bachti aur level hamesha hal ho sakta hai.
 function build(L){
   const R = rng(L * 7919 + 13);
-  cols = Math.min(22, 21 + Math.floor(L / 400)); rows = Math.round(cols * 1.45);
-  const avg = 8 + Math.min(L / 40, 22);
+  cols = Math.min(24, 11 + Math.floor(L * 0.5)); rows = Math.round(cols * 1.45);
+  const avg = Math.min(30, 5 + L / 20);
   const g = Array.from({length: rows}, () => Array(cols).fill(-1)), S = [];
   const inb = (x, y) => x >= 0 && y >= 0 && x < cols && y < rows;
   const free = (x, y) => inb(x, y) && g[y][x] < 0;
@@ -116,10 +117,10 @@ function build(L){
   return S;
 }
 
-// Har level mein lakeer ki moti aur head ka size thora alag. Head hamesha bhara hua tikon
+// Bohat patli lakeer. Har level mein moti thori alag
 function mkStyle(L){
   const R = rng(L * 31 + 5);
-  return {lw: .13 + R() * .05, hs: .95 + R() * .2, join: R() < .5 ? 'round' : 'miter'};
+  return {lw: .07 + R() * .03, join: R() < .5 ? 'round' : 'miter'};
 }
 
 // Arrow ke samne kitne cell door rukawat hai (0 matlab raasta khula)
@@ -159,13 +160,13 @@ function slice(P, a, b){ // lakeer ka wo hissa jo a se b ki lambai ke beech ho
   return out;
 }
 
-// Mukammal arrow ka sira (⬆️ jaisa): bhara hua tikon jo lakeer se jura hai
-function drawHead(x, y, dx, dy, c){
+// Mukammal arrow ka sira: bhara hua tikon jo lakeer se jura hai. Size lakeer ki moti ke hisab se
+function drawHead(x, y, dx, dy, hw){
   const px = -dy, py = dx;
   ctx.beginPath();
-  ctx.moveTo(x + dx*c*.5, y + dy*c*.5);
-  ctx.lineTo(x - dx*c*.1 + px*c*.32, y - dy*c*.1 + py*c*.32);
-  ctx.lineTo(x - dx*c*.1 - px*c*.32, y - dy*c*.1 - py*c*.32);
+  ctx.moveTo(x + dx*hw*1.5, y + dy*hw*1.5);
+  ctx.lineTo(x - dx*hw*.1 + px*hw, y - dy*hw*.1 + py*hw);
+  ctx.lineTo(x - dx*hw*.1 - px*hw, y - dy*hw*.1 - py*hw);
   ctx.closePath(); ctx.fill();
 }
 
@@ -173,7 +174,7 @@ function frame(now){
   ctx.clearRect(0, 0, W, H);
   ctx.save(); ctx.translate(ox, oy);
   for (const s of snakes) {
-    let u = 0, lw = cell * st.lw, col = ARROW;
+    let u = 0, lw = Math.max(1.2, cell * st.lw), col = ARROW;
     if (s.out) {                                   // raasta khula: lakeer par sarak kar nikalta hai
       const t = (now - s.out) / s.dur;
       if (t >= 1) continue;
@@ -181,7 +182,7 @@ function frame(now){
     } else if (s.bump && now - s.bump < 500) {     // takraya: lal ho kar wapis apni jagah
       u = Math.sin(Math.PI * (now - s.bump) / 500) * s.gap; col = '#d64545';
     }
-    if (s.id === hintId && now < hintT) { col = '#f08a00'; lw *= 1.4; }
+    if (s.id === hintId && now < hintT) { col = '#f08a00'; lw *= 1.6; }
     const pts = slice(s.P, u, u + s.Lb);
     if (pts.length < 2) continue;
     ctx.strokeStyle = col; ctx.fillStyle = col;
@@ -192,7 +193,7 @@ function frame(now){
     const a = pts[pts.length - 2], b = pts[pts.length - 1];
     let dx = Math.sign(b[0] - a[0]), dy = Math.sign(b[1] - a[1]);
     if (!dx && !dy) { dx = s.dx; dy = s.dy; }
-    drawHead(b[0] * cell, b[1] * cell, dx, dy, cell * st.hs);
+    drawHead(b[0] * cell, b[1] * cell, dx, dy, Math.max(lw * 1.7, cell * .17));
   }
   ctx.restore();
   requestAnimationFrame(frame);
@@ -209,7 +210,7 @@ function dseg(px, py, ax, ay, bx, by){
 cv.addEventListener('pointerdown', e => {
   const r = cv.getBoundingClientRect();
   const x = e.clientX - r.left - ox, y = e.clientY - r.top - oy;
-  let bestS = null, bd = Math.max(cell * .5, 8);
+  let bestS = null, bd = Math.max(cell * .5, 10);
   for (const s of snakes) {
     if (!s.alive) continue;
     if (s.p.length === 1) {
