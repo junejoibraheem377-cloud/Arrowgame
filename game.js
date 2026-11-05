@@ -57,11 +57,11 @@ function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15
 
 // Grid kinare se andar ki taraf bharta hai. Arrows lambay hote hain aur deewar ya
 // doosre arrows se chipak kar chalte hain. Koi jagah khali nahi bachti aur level
-// hamesha hal ho sakta hai. Level barhne par grid bara aur arrows lambay (zyada mushkil).
+// hamesha hal ho sakta hai. Level barhne par arrows lambay aur uljhe (zyada mushkil).
 function build(L){
   const R = rng(L * 7919 + 13);
-  cols = Math.min(20, 13 + Math.floor(L / 60)); rows = Math.round(cols * 1.5);
-  const avg = 6 + Math.min(L / 50, 14);
+  cols = Math.min(22, 21 + Math.floor(L / 400)); rows = Math.round(cols * 1.45);
+  const avg = 8 + Math.min(L / 40, 22);
   const g = Array.from({length: rows}, () => Array(cols).fill(-1)), S = [];
   const inb = (x, y) => x >= 0 && y >= 0 && x < cols && y < rows;
   const free = (x, y) => inb(x, y) && g[y][x] < 0;
@@ -119,7 +119,7 @@ function build(L){
 // Har level ka apna design (head aur moti). Rang screenshot wala bhoora
 function mkStyle(L){
   const R = rng(L * 31 + 5);
-  return {lw: .15 + R() * .06, head: L % 3, join: R() < .5 ? 'round' : 'miter'};
+  return {lw: .13 + R() * .05, head: L % 3, join: R() < .5 ? 'round' : 'miter'};
 }
 
 // Arrow ke samne kitne cell door rukawat hai (0 matlab raasta khula)
@@ -220,7 +220,7 @@ function dseg(px, py, ax, ay, bx, by){
 cv.addEventListener('pointerdown', e => {
   const r = cv.getBoundingClientRect();
   const x = e.clientX - r.left - ox, y = e.clientY - r.top - oy;
-  let bestS = null, bd = Math.max(cell * .5, 12);
+  let bestS = null, bd = Math.max(cell * .5, 8);
   for (const s of snakes) {
     if (!s.alive) continue;
     if (s.p.length === 1) {
