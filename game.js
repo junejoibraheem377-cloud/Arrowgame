@@ -116,10 +116,10 @@ function build(L){
   return S;
 }
 
-// Har level ka apna design (head aur moti). Rang screenshot wala bhoora
+// Har level mein lakeer ki moti aur head ka size thora alag. Head hamesha bhara hua tikon
 function mkStyle(L){
   const R = rng(L * 31 + 5);
-  return {lw: .13 + R() * .05, head: L % 3, join: R() < .5 ? 'round' : 'miter'};
+  return {lw: .13 + R() * .05, hs: .95 + R() * .2, join: R() < .5 ? 'round' : 'miter'};
 }
 
 // Arrow ke samne kitne cell door rukawat hai (0 matlab raasta khula)
@@ -159,25 +159,14 @@ function slice(P, a, b){ // lakeer ka wo hissa jo a se b ki lambai ke beech ho
   return out;
 }
 
-function drawHead(x, y, dx, dy, c, type){
+// Mukammal arrow ka sira (⬆️ jaisa): bhara hua tikon jo lakeer se jura hai
+function drawHead(x, y, dx, dy, c){
   const px = -dy, py = dx;
   ctx.beginPath();
-  if (type === 0) {
-    ctx.moveTo(x + dx*c*.45, y + dy*c*.45);
-    ctx.lineTo(x - dx*c*.05 + px*c*.3, y - dy*c*.05 + py*c*.3);
-    ctx.lineTo(x - dx*c*.05 - px*c*.3, y - dy*c*.05 - py*c*.3);
-    ctx.closePath(); ctx.fill();
-  } else if (type === 1) {
-    ctx.moveTo(x + dx*c*.6, y + dy*c*.6);
-    ctx.lineTo(x - dx*c*.1 + px*c*.22, y - dy*c*.1 + py*c*.22);
-    ctx.lineTo(x - dx*c*.1 - px*c*.22, y - dy*c*.1 - py*c*.22);
-    ctx.closePath(); ctx.fill();
-  } else {
-    ctx.moveTo(x - dx*c*.1 + px*c*.3, y - dy*c*.1 + py*c*.3);
-    ctx.lineTo(x + dx*c*.4, y + dy*c*.4);
-    ctx.lineTo(x - dx*c*.1 - px*c*.3, y - dy*c*.1 - py*c*.3);
-    ctx.stroke();
-  }
+  ctx.moveTo(x + dx*c*.5, y + dy*c*.5);
+  ctx.lineTo(x - dx*c*.1 + px*c*.32, y - dy*c*.1 + py*c*.32);
+  ctx.lineTo(x - dx*c*.1 - px*c*.32, y - dy*c*.1 - py*c*.32);
+  ctx.closePath(); ctx.fill();
 }
 
 function frame(now){
@@ -203,7 +192,7 @@ function frame(now){
     const a = pts[pts.length - 2], b = pts[pts.length - 1];
     let dx = Math.sign(b[0] - a[0]), dy = Math.sign(b[1] - a[1]);
     if (!dx && !dy) { dx = s.dx; dy = s.dy; }
-    drawHead(b[0] * cell, b[1] * cell, dx, dy, cell, st.head);
+    drawHead(b[0] * cell, b[1] * cell, dx, dy, cell * st.hs);
   }
   ctx.restore();
   requestAnimationFrame(frame);
